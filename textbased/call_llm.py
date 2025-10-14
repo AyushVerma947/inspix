@@ -5,6 +5,10 @@ import numpy as np
 import torch
 from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 from sentence_transformers import SentenceTransformer
+# Sentiment & Emotion Analysis
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import torch.nn.functional as F
+
 
 # ============================================================== #
 # CONFIGURATION
@@ -34,9 +38,51 @@ qa_model = AutoModelForSeq2SeqLM.from_pretrained(qa_model_name).to(DEVICE)
 
 print(f"✅ All models loaded successfully on {DEVICE}!\n")
 
+# Sentiment Analysis (fine-tuned RoBERTa)
+# cardiffnlp/twitter-roberta-base-sentiment-latest
+sentiment_model_name = "nlptown/bert-base-multilingual-uncased-sentiment"
+sentiment_tokenizer = AutoTokenizer.from_pretrained(sentiment_model_name)
+sentiment_model = AutoModelForSequenceClassification.from_pretrained(sentiment_model_name).to(DEVICE)
+
+# Aspect-Based Sentiment (optional: same model but applied on extracted aspects)
+aspect_model_name = sentiment_model_name  # reuse same model for ABSA
+aspect_tokenizer = sentiment_tokenizer
+aspect_model = sentiment_model
+
+
 # ============================================================== #
 # HELPER FUNCTIONS
 # ============================================================== #
+
+def analyze_sentiment(text):
+    """
+    Returns sentiment label and confidence score for a given text.
+    """
+    inputs = sentiment_tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(DEVICE)
+    with torch.no_grad():
+        outputs = sentiment_model(**inputs)
+        probs = F.softmax(outputs.logits, dim=-1)
+    label_id = torch.argmax(probs, dim=1).item()
+    label = sentiment_model.config.id2label[label_id]
+    score = probs[0][label_id].item()
+    return {"label": label, "score": round(score, 3)}
+
+def aspect_based_sentiment_analysis(text, aspects):
+    """
+    Performs simple Aspect-Based Sentiment Analysis by checking sentiment of each aspect mention.
+    """
+    results = {}
+    for aspect in aspects:
+        if aspect.lower() in text.lower():
+            inputs = aspect_tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(DEVICE)
+            with torch.no_grad():
+                outputs = aspect_model(**inputs)
+                probs = F.softmax(outputs.logits, dim=-1)
+            label_id = torch.argmax(probs, dim=1).item()
+            label = aspect_model.config.id2label[label_id]
+            results[aspect] = label
+    return results if results else {"info": "No specified aspects found."}
+
 
 def get_embedding(text):
     return np.array(embedder.encode([text], convert_to_numpy=True)[0], dtype=np.float32)
@@ -134,6 +180,20 @@ def summarize_and_chat(video_id):
     print("\n✅ Summary Generated:\n")
     print(summary)
     print("\n" + "="*80)
+
+    # Sentiment analysis on full video transcript
+    print("🧩 Running sentiment analysis on full transcript...")
+    full_transcript = " ".join([m["text"] for m in metadata])
+    sentiment_result = analyze_sentiment(full_transcript)
+    print(f"\n🧠 Overall Sentiment: {sentiment_result['label']} (Confidence: {sentiment_result['score']})")
+
+    # Aspect-Based Sentiment
+    common_aspects = ["product", "service", "performance", "battery", "design", "price", "experience"]
+    absa_results = aspect_based_sentiment_analysis(full_transcript, common_aspects)
+    print("\n💬 Aspect-Based Sentiment:")
+    for aspect, sentiment in absa_results.items():
+        print(f" - {aspect.capitalize()}: {sentiment}")
+
 
     # Q&A loop
     while True:
