@@ -1,0 +1,10 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+
+venv/
+key_frames/
+textbased/videos
+textbased/audio
+results_images
+review.mp4
+audio.*
+audio2.*

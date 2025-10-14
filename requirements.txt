@@ -1,0 +1,16 @@
+moviepy==1.0.3
+torch
+transformers
+ffmpeg
+SpeechRecognition
+openai-whisper
+opencv-python
+opencv-contrib-python
+open_clip_torch
+faiss-cpu
+pillow
+langchain
+sentence_transformers
+torchvision
+ollama
+
