@@ -454,10 +454,10 @@ def summarize_and_chat(video_id):
 
     print("🧠 Generating hierarchical summary...")
     texts = [m["text"] for m in metadata]
-    # summary = hierarchical_summarize(texts)
-    # print("\n✅ Summary Generated:\n")
-    # print(summary)
-    # print("\n" + "="*80)
+    summary = hierarchical_summarize(texts)
+    print("\n✅ Summary Generated:\n")
+    print(summary)
+    print("\n" + "="*80)
 
     # Sentiment analysis on full video transcript
     print("🧩 Running sentiment analysis on full transcript...")

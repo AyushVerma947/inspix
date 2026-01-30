@@ -147,6 +147,8 @@ def answer_query(question, context_chunks):
             f"Context:\n{chunk}\n\n"
             f"Question: {question}\n"
             "Answer only using the context above. "
+            "answer should be a proper sentence."
+            "try to give descriptive answers."
             "If the answer is not present in the context, respond 'Not found in the video.'"
         )
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512).to(DEVICE)
