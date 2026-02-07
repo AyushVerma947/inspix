@@ -57,9 +57,10 @@ def Download(link):
 
 # Test with multiple YouTube URLs
 links = [
-    "https://www.youtube.com/watch?v=yOOCBqZtkYE",
-    "https://www.youtube.com/watch?v=Zu9rfb7xNJY",
-    "https://www.youtube.com/watch?v=J4f-c1f1kxg"
+    # "https://www.youtube.com/watch?v=yOOCBqZtkYE",
+    # "https://www.youtube.com/watch?v=Zu9rfb7xNJY",
+    # "https://www.youtube.com/watch?v=J4f-c1f1kxg",
+    "https://www.youtube.com/watch?v=BL4vIHwUlXQ"
 ]
 
 for link in links:
