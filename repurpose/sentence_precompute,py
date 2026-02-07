@@ -1,0 +1,133 @@
+import os
+import re
+import pickle
+import whisper
+import faiss
+import numpy as np
+from moviepy.editor import VideoFileClip
+from sentence_transformers import SentenceTransformer
+
+# ================= CONFIG =================
+
+VIDEOS_DIR = "../textbased/videos"
+AUDIO_DIR = "audio"
+FAISS_DIR = "faiss_db"
+
+WHISPER_MODEL = "base"
+EMBED_MODEL = "all-MiniLM-L6-v2"
+
+os.makedirs(AUDIO_DIR, exist_ok=True)
+os.makedirs(FAISS_DIR, exist_ok=True)
+
+FAISS_INDEX_PATH = os.path.join(FAISS_DIR, "index.faiss")
+METADATA_PATH = os.path.join(FAISS_DIR, "metadata.pkl")
+
+SENTENCE_END_REGEX = re.compile(r"[.!?]")
+
+# ================= LOAD MODELS =================
+
+whisper_model = whisper.load_model(WHISPER_MODEL)
+embed_model = SentenceTransformer(EMBED_MODEL)
+
+# ================= AUDIO =================
+
+def extract_audio(video_path, audio_path):
+    clip = VideoFileClip(video_path)
+    clip.audio.write_audiofile(audio_path, codec="mp3", verbose=False, logger=None)
+    clip.close()
+
+# ================= SENTENCE CHUNKING =================
+
+def sentence_chunking_with_timestamps(whisper_result):
+    sentences = []
+    current_words = []
+    sentence_start = None
+    last_word_end = None
+
+    for segment in whisper_result["segments"]:
+        for w in segment["words"]:
+            word = w["word"].strip()
+            start = w["start"]
+            end = w["end"]
+
+            if sentence_start is None:
+                sentence_start = start
+
+            current_words.append(word)
+            last_word_end = end
+
+            if SENTENCE_END_REGEX.search(word):
+                sentences.append({
+                    "text": " ".join(current_words).strip(),
+                    "start": sentence_start,
+                    "end": end
+                })
+                current_words = []
+                sentence_start = None
+
+    if current_words:
+        sentences.append({
+            "text": " ".join(current_words).strip(),
+            "start": sentence_start,
+            "end": last_word_end
+        })
+
+    return sentences
+
+# ================= MAIN INDEXING =================
+
+def main():
+    index = None
+    metadata = []
+
+    for file in os.listdir(VIDEOS_DIR):
+        if not file.endswith((".mp4", ".mkv", ".mov")):
+            continue
+
+        video_path = os.path.join(VIDEOS_DIR, file)
+        video_id = os.path.splitext(file)[0]
+        audio_path = os.path.join(AUDIO_DIR, f"{video_id}.mp3")
+
+        print(f"\n🎬 Processing {video_id}")
+
+        if not os.path.exists(audio_path):
+            extract_audio(video_path, audio_path)
+
+        result = whisper_model.transcribe(
+            audio_path,
+            word_timestamps=True,
+            verbose=False
+        )
+
+        sentences = sentence_chunking_with_timestamps(result)
+
+        for s in sentences:
+            emb = embed_model.encode(
+                s["text"],
+                normalize_embeddings=True
+            ).astype("float32")
+
+            if index is None:
+                index = faiss.IndexFlatIP(len(emb))
+
+            index.add(np.array([emb]))
+
+            metadata.append({
+                "video_id": video_id,
+                "video_path": video_path,
+                "text": s["text"],
+                "start": s["start"],
+                "end": s["end"]
+            })
+
+        print(f"✅ Indexed {len(sentences)} sentences")
+
+    faiss.write_index(index, FAISS_INDEX_PATH)
+
+    with open(METADATA_PATH, "wb") as f:
+        pickle.dump(metadata, f)
+
+    print("\n🎯 Indexing complete")
+
+if __name__ == "__main__":
+    main()

@@ -118,6 +118,6 @@ def query_to_video(video_id, query):
 if __name__ == "__main__":
     query_to_video(
         video_id="142536",
-        query="battery, camera"
+        query="tell me about new features ."
     )
 
